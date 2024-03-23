@@ -66,11 +66,25 @@ export async function reverse_proxy(
     request: NextRequest,
 ): Promise<NextResponse<unknown>> {
     try {
-        const response = await fetch(url, {
+        const req = new Request(url, {
             headers: requestHeaders,
             method: request.method,
             body: request.body,
         });
+        console.log(
+            JSON.stringify(
+                {
+                    request: {
+                        method: req.method,
+                        url: req.url,
+                        headers: Object.fromEntries(req.headers),
+                    },
+                },
+                null,
+                4,
+            ),
+        );
+        const response = await fetch(req);
 
         return new NextResponse(response.body, {
             headers: response.headers,
