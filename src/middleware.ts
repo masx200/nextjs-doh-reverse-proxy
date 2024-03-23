@@ -1,17 +1,7 @@
-// import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { NextMiddleWare } from "./NextMiddleWare";
 
-// This function can be marked `async` if using `await` inside
-// export function middleware(request: NextRequest) {
-//   return NextResponse.redirect(new URL("/home", request.url));
-// }
-
-// See "Matching Paths" below to learn more
-// export const config = {
-//   matcher: "/about/:path*",
-// };
 /**
  * 主要中间件函数，用于处理请求并根据路径进行反向代理。
  *
@@ -25,7 +15,8 @@ export async function middlewareMain(
 ): Promise<NextResponse<unknown>> {
     const nextUrl = new URL(request.url);
     console.log({ url: request.nextUrl.href, method: request.method });
-    const token = process.env.token;
+    const DOH_ENDPOINT = process.env.DOH_ENDPOINT ??
+        "https://doh.pub/dns-query";
 
     console.log({ headers: Object.fromEntries(request.headers) });
     const requestHeaders = new Headers(request.headers);
@@ -36,67 +27,20 @@ export async function middlewareMain(
         }; for=${request.headers.get("x-forwarded-for")}; host=${
             request.headers.get("x-forwarded-host") ?? request.nextUrl.host
         }; proto=${
-            request.nextUrl.href.startsWith("https://") ? "https" : "http"
+            request.nextUrl.href.startsWith("https:") ? "https" : "http"
         }`,
     );
-    if (request.nextUrl.pathname.startsWith("/token/" + token + "/http/")) {
-        // const hostname = "dash.deno.com"; // or 'eu.posthog.com'
-        let url = new URL(
-            "http://" +
-                request.nextUrl.pathname.slice(6 + ("/token/" + token).length),
-        );
-        url.search = request.nextUrl.search;
-        while (url.pathname.startsWith("/token/" + token + "/http/")) {
-            url = new URL(
-                "http://" +
-                    url.pathname.slice(6 + ("/token/" + token).length),
-            );
-            url.search = nextUrl.search;
-        }
-        console.log({ url: url.href, method: request.method });
-        // const requestHeaders = new Headers(request.headers);
-        requestHeaders.set("host", url.hostname);
+    if (request.nextUrl.pathname === "/dns-query") {
+        let url = new URL(DOH_ENDPOINT);
+        url.search = nextUrl.search;
 
-        // url.protocol = "https";
-        // url.hostname = hostname;
-        // url.port = String(443);
-        //   url.pathname = url.pathname; //.replace(/^\//, '');
-        return await reverse_proxy(url, requestHeaders, request);
-    }
-    if (request.nextUrl.pathname.startsWith("/token/" + token + "/https/")) {
-        let url = new URL(
-            "https://" +
-                request.nextUrl.pathname.slice(
-                    6 + 1 + ("/token/" + token).length,
-                ),
-        );
-        /* 添加search */
-        url.search = request.nextUrl.search;
-        /* 循环处理多重前缀 */
-        while (url.pathname.startsWith("/token/" + token + "/https/")) {
-            url = new URL(
-                "https://" +
-                    url.pathname.slice(
-                        6 + 1 + ("/token/" + token).length,
-                    ),
-            );
-            /* 添加search */
-            url.search = nextUrl.search;
-        }
         console.log({ url: url.href, method: request.method });
 
         requestHeaders.set("host", url.hostname);
 
-        // url.protocol = "https";
-        // url.hostname = hostname;
-        // url.port = String(443);
-        //   url.pathname = url.pathname; //.replace(/^\//, '');
-
-        // return NextResponse.rewrite(url, {
-        //   headers: requestHeaders,
-        // });
         return await reverse_proxy(url, requestHeaders, request);
     }
+
     return NextResponse.next();
 }
 export async function middleware(
@@ -126,11 +70,6 @@ export async function reverse_proxy(
             headers: requestHeaders,
             method: request.method,
             body: request.body,
-            /* 关闭重定向 */
-            /* 可以设定请求头中的字段"x-proxy-redirect"为"error" | "follow" |
-"manual"来设定代理行为的重定向方式. */
-            redirect: (requestHeaders.get("x-proxy-redirect") ??
-                "manual") as RequestRedirect,
         });
 
         return new NextResponse(response.body, {
@@ -150,7 +89,6 @@ export async function middlewareLogger(
     console.log(
         JSON.stringify(
             {
-                // ...info,
                 request: {
                     method: request.method,
                     url: request.url,
@@ -184,15 +122,13 @@ export async function middlewareLogger(
 export async function Strict_Transport_Security(
     ...[_request, _info, next]: Parameters<NextMiddleWare>
 ): Promise<NextResponse> {
-    // console.log(2);
     const response = await next();
     const headers = new Headers(response.headers);
 
     headers.append("Strict-Transport-Security", "max-age=31536000");
-    // console.log(ctx.response.body);
-    // 必须把响应的主体转换为Uint8Array才行
+
     const body = response.body && (await bodyToBuffer(response.body));
-    // headers.delete("content-length");
+
     const res = new NextResponse(body, {
         status: response.status,
         headers,
