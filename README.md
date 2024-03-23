@@ -1,4 +1,4 @@
-# nextjs-reverse-proxy-middleware
+# nextjs-doh-reverse-proxy
 
 This is a [Next.js](https://nextjs.org/) project bootstrapped with
 [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
@@ -51,21 +51,18 @@ details.
 
 # 运行方式
 
-设置环境变量 token 访问秘钥
+设置环境变量 `DOH_ENDPOINT` 上游服务器地址
 
 ```
-npx cross-env token=token123456 npm run dev
+npx cross-env DOH_ENDPOINT=https://doh.pub/dns-query npm run dev
 ```
 
 访问地址:
 
 ```
-http://localhost:3000/token/token123456/https/www.360.cn
+http://localhost:3000/dns-query
 ```
 
-```
-http://localhost:3000/token/token123456/http/example.com
-```
+# 设置环境变量
 
-可以设定请求头中的字段"x-proxy-redirect"为"error" | "follow" |
-"manual"来设定代理行为的重定向方式.
+`DOH_ENDPOINT=https://doh.pub/dns-query`

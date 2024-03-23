@@ -1,5 +1,5 @@
 {
-    "name": "nextjs-reverse-proxy-middleware",
+    "name": "@masx200/nextjs-doh-reverse-proxy",
     "version": "0.1.0",
     "private": true,
     "scripts": {
