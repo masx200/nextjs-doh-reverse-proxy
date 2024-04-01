@@ -1,6 +1,7 @@
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { NextMiddleWare } from "./NextMiddleWare";
+import { fetchDebug } from "./fetchDebug";
 
 /**
  * 主要中间件函数，用于处理请求并根据路径进行反向代理。
@@ -12,7 +13,7 @@ import { NextMiddleWare } from "./NextMiddleWare";
 export async function middlewareMain(
     request: NextRequest,
     event: NextFetchEvent,
-): Promise<NextResponse<unknown>> {
+): Promise<NextResponse<any> | Response> {
     const nextUrl = new URL(request.url);
     console.log({ url: request.nextUrl.href, method: request.method });
     const DOH_ENDPOINT = process.env.DOH_ENDPOINT ??
@@ -47,26 +48,32 @@ export async function middleware(
     request: NextRequest,
     event: NextFetchEvent,
 ): Promise<NextResponse<unknown>> {
-    return await middlewareLogger(
-        request,
-        event,
-        async () => {
-            return await Strict_Transport_Security(request, event, async () => {
-                return await middlewareMain(request, event);
-            });
-        },
+    return ResponseToNextResponse(
+        await middlewareLogger(
+            request,
+            event,
+            async () => {
+                return await Strict_Transport_Security(
+                    request,
+                    event,
+                    async () => {
+                        return await middlewareMain(request, event);
+                    },
+                );
+            },
+        ),
     );
 }
 export const config = {
     matcher: "/:path*",
 };
 export async function reverse_proxy(
-    url: URL,
+    upurl: URL,
     requestHeaders: Headers,
     request: NextRequest,
-): Promise<NextResponse<unknown>> {
+): Promise<NextResponse<any> | Response> {
     try {
-        const req = new Request(url, {
+        const req = new Request(upurl, {
             headers: requestHeaders,
             method: request.method,
             body: request.body,
@@ -84,12 +91,21 @@ export async function reverse_proxy(
                 4,
             ),
         );
+        const body = req.body && (await bodyToBuffer(req.body));
+
+        if (req.method === "POST" && body && body?.length) {
+            const geturl = new URL(upurl);
+
+            geturl.searchParams.set("dns", base64Encode(body));
+            return await fetchDebug(geturl, {
+                // body,
+                headers: requestHeaders,
+                method: "GET",
+            });
+        }
         const response = await fetch(req);
 
-        return new NextResponse(response.body, {
-            headers: response.headers,
-            status: response.status,
-        });
+        return ResponseToNextResponse(response);
     } catch (error) {
         console.error(error);
         return new NextResponse("bad gateway" + "\n" + String(error), {
@@ -97,9 +113,18 @@ export async function reverse_proxy(
         });
     }
 }
+async function ResponseToNextResponse(
+    response: Response,
+): Promise<NextResponse<any>> {
+    return new NextResponse(response.body, {
+        headers: response.headers,
+        status: response.status,
+    });
+}
+
 export async function middlewareLogger(
     ...[request, _info, next]: Parameters<NextMiddleWare>
-): Promise<NextResponse> {
+): Promise<NextResponse | Response> {
     console.log(
         JSON.stringify(
             {
@@ -153,4 +178,17 @@ export async function bodyToBuffer(
     body?: BodyInit | null,
 ): Promise<Uint8Array> {
     return new Uint8Array(await new Response(body).arrayBuffer());
+}
+function base64Encode(byteArray: any): string {
+    const buffer = new Uint8Array(byteArray);
+    const binaryString = buffer.reduce(
+        (str, byte) => str + String.fromCharCode(byte),
+        "",
+    );
+    const encoded = btoa(binaryString)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=/g, "");
+
+    return encoded;
 }
