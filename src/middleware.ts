@@ -95,7 +95,8 @@ export async function reverse_proxy(
 
         if (req.method === "POST" && body && body?.length) {
             const geturl = new URL(upurl);
-
+            /* RequestContentLengthMismatchError: Request body length does not match content-length header */
+            requestHeaders.delete("content-length");
             geturl.searchParams.set("dns", base64Encode(body));
             return await fetchDebug(geturl, {
                 // body,
