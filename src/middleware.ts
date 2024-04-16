@@ -14,6 +14,9 @@ export async function middlewareMain(
     request: NextRequest,
     event: NextFetchEvent,
 ): Promise<NextResponse<any> | Response> {
+    const DOH_PATHNAME = process.env.DOH_PATHNAME ??
+        "/dns-query";
+
     const nextUrl = new URL(request.url);
     console.log({ url: request.nextUrl.href, method: request.method });
     const DOH_ENDPOINT = process.env.DOH_ENDPOINT ??
@@ -31,7 +34,14 @@ export async function middlewareMain(
             request.nextUrl.href.startsWith("https:") ? "https" : "http"
         }`,
     );
-    if (request.nextUrl.pathname === "/dns-query") {
+    if (
+        request.nextUrl.pathname === DOH_PATHNAME &&
+        ((request.method === "GET" &&
+            request.nextUrl.searchParams.get("dns")?.length) ||
+            request.method === "POST" &&
+                request.headers.get("content-type") ===
+                    "application/dns-message")
+    ) {
         let url = new URL(DOH_ENDPOINT);
         url.search = nextUrl.search;
 
