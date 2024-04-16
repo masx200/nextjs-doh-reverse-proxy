@@ -65,4 +65,10 @@ http://localhost:3000/dns-query
 
 # 设置环境变量
 
+设置环境变量 `DOH_ENDPOINT` 上游服务器地址
+
 `DOH_ENDPOINT=https://doh.pub/dns-query`
+
+设置环境变量 `DOH_PATHNAME` 为这个服务器的doh的路径
+
+`DOH_PATHNAME=/dns-query`
